@@ -1,0 +1,70 @@
+image: node:8.11.1
+
+cache:
+  paths:
+    - node_modules/
+
+stages:
+  - lint
+  - build
+  - deploy
+
+lint:
+  stage: lint
+  tags:
+    - web
+  script:
+    - npm i --registry https://registry.npm.taobao.org
+    - npm run lint
+
+build:
+  stage: build
+  tags:
+    - web
+  only:
+    - master
+    - develop
+  script:
+    - npm i --registry https://registry.npm.taobao.org
+    - npm run build
+  artifacts:
+     paths:
+       - dist
+     expire_in: 1 week
+
+deploy-test:
+  image: alpine
+  stage: deploy
+  tags:
+    - web
+  script:
+    - sed -i 's/dl-cdn.alpinelinux.org/mirrors.aliyun.com/g' /etc/apk/repositories
+    - apk add --no-cache rsync openssh
+    - mkdir -p ~/.ssh
+    - echo "$SSH_PRIVATE_KEY" >> ~/.ssh/id_rsa
+    - chmod 600 ~/.ssh/id_rsa
+    - echo -e "Host *\n\tStrictHostKeyChecking no\n\n" > ~/.ssh/config
+    - rsync -rav --delete dist/ root@39.96.34.53:/var/www/zhiai/web-app
+  environment:
+    name: test
+    url: http://dev.zhiai.live/
+
+deploy-prod:
+  image: alpine
+  stage: deploy
+  when: manual
+  only:
+    - master
+  tags:
+    - web
+  script:
+    - sed -i 's/dl-cdn.alpinelinux.org/mirrors.aliyun.com/g' /etc/apk/repositories
+    - apk add --no-cache rsync openssh
+    - mkdir -p ~/.ssh
+    - echo "$SSH_PRIVATE_KEY" >> ~/.ssh/id_rsa
+    - chmod 600 ~/.ssh/id_rsa
+    - echo -e "Host *\n\tStrictHostKeyChecking no\n\n" > ~/.ssh/config
+    - rsync -rav --delete dist/ root@118.190.39.118:/var/www/zhiai/web-app
+  environment:
+    name: prod
+    url: http://www.zhiai2019.com/
